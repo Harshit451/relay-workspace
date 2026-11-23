@@ -1,79 +1,97 @@
 # Relay team chat
 
-Relay is a React and Express team chat project. The backend uses MongoDB through Mongoose, JWT for API and Socket.IO authentication, and Cloudinary for message attachments.
+Relay is a real-time team chat built with React, Vite, Express, Socket.IO, MongoDB, and Cloudinary. The root npm scripts use concurrently so local development and production builds run from the repository root, with dedicated manifests in `client/` and `server/`.
 
-## Run locally
+## Project structure
 
-Use Node.js 20.19 or newer. Install the dependencies with `npm install`.
-
-Create a MongoDB Atlas deployment, add a database user, and allow your current IP address in the Atlas project's Network Access settings. In Atlas, select **Connect → Drivers → Node.js** and copy the connection string. Replace its password placeholder; URL-encode reserved characters in the username or password.
-
-Copy `.env.example` to `.env` if you do not already have a local `.env` file. Fill in:
-
-```env
-MONGODB_URI=mongodb+srv://<database-user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
-MONGODB_DB_NAME=relay_workspace
-JWT_SECRET=<long-random-secret>
-PORT=4000
-CLIENT_ORIGIN=http://localhost:5173
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
+```text
+.
+├── client/                 # React + Vite app
+│   ├── src/
+│   │   ├── components/     # Auth, shared modal, and modal flows
+│   │   ├── lib/            # Shared client helpers
+│   │   ├── services/       # REST API and Socket.IO clients
+│   │   └── styles/         # App styles
+│   ├── .env.example
+│   └── package.json
+├── server/                 # Express + Socket.IO API
+│   ├── src/
+│   │   ├── config/          # Environment, database, and Cloudinary setup
+│   │   ├── controllers/     # Message business logic
+│   │   ├── middleware/      # Auth, upload, and error handling
+│   │   ├── models/          # Mongoose models
+│   │   ├── routes/          # Auth, conversation, message, upload, and search routes
+│   │   ├── socket/          # JWT-authenticated Socket.IO handlers
+│   │   ├── utils/           # Starter data seeding
+│   │   └── index.js         # HTTP server composition and startup
+│   ├── .env.example
+│   └── package.json
+├── .env.example             # Root-level environment template for local server startup
+├── package.json            # Root scripts and shared dependency installation
+└── README.md
 ```
 
-Generate a secret locally with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Keep `.env` private. It is excluded by `.gitignore`; commit `.env.example` only.
-
-Create a Cloudinary account and add its cloud name, API key, and API secret to `.env` to enable attachments. Uploads are limited to 10 MB each and support common image formats, PDF, plain text, and DOCX. Attachments are stored in Cloudinary rather than on the app server's disk.
-
-Start the API and Vite frontend together:
+The root scripts stay compatible with Render and local development:
 
 ```sh
-npm run dev
+npm install
+npm run dev       # client on :5173 and API/socket server on :4000
+npm run build     # writes client/dist
+npm start         # starts the API/socket server
 ```
 
-Open `http://localhost:5173`. The server connects to Atlas and creates the starter channels on first startup. You can also connect MongoDB Compass to the same Atlas cluster to inspect the database.
+## Local setup
 
-## Included in this implementation
+1. Use Node.js 20.19 or newer and run `npm install` at the repository root.
+2. Create a MongoDB Atlas database, add a database user, and permit your current IP in Atlas Network Access. Copy the Atlas driver URI.
+3. Copy the root `.env.example` to `.env` and fill in `MONGODB_URI`, `MONGODB_DB_NAME`, `JWT_SECRET`, and `CLIENT_ORIGIN`. Keep `.env` private.
+4. Copy `client/.env.example` to `client/.env`. Leave `VITE_API_URL=http://localhost:4000` for local development.
+5. Add Cloudinary credentials to `.env` if you want file attachments.
+6. Run `npm run dev` from the root and open `http://localhost:5173`.
+
+You can also run `npm run dev --prefix server` or `npm run dev --prefix client` independently after installing dependencies at the repository root. Each app has its own package manifest; the root manifest keeps `npm ci`, `npm run dev`, `npm run build`, and `npm start` compatible with local development and Render. Root `.env` is used by the root scripts.
+
+## Included functionality
 
 - Signup, login, JWT protected API routes, and password hashing
-- Mongoose schemas and indexes for users, conversations, messages, notifications, invites, and uploads
-- Public channels, direct conversations, and groups with a creator admin
-- Socket.IO authentication, message delivery, typing events, presence, read receipts, and reconnect behavior
-- Cursor based message history, message search, unread counts, replies, editing, deletion, reactions, and pinning
-- Optimistic message states with a stable client ID so a reconnect retry does not duplicate a saved message
-- Group member management with admin/member roles and a last-admin safeguard
-- Cloudinary upload route and attachment previews
-- Persistent in-app notifications for offline direct/group messages and `@email` mentions
+- MongoDB models for users, conversations, messages, notifications, invites, and uploads
+- Public channels, direct conversations, and groups with member/admin controls
+- Socket.IO message delivery, typing events, presence, read receipts, and reconnect behavior
+- Cursor based history, search, unread counts, replies, editing, deletion, reactions, and pinning
+- Duplicate-safe optimistic message retries
+- Cloudinary uploads and attachment previews
+- Persistent in-app notifications for offline messages and email mentions
 
 ## GitHub
 
-Create an empty repository on GitHub, then run these commands in the project folder. Before the first commit, check that `.env` is ignored and `.env.example` is the only environment file staged.
+Create an empty GitHub repository and from this project root run:
 
 ```sh
-git init
 git add .
 git status --short
-git commit -m "Build Relay team chat"
+git commit -m "Refactor Relay into MERN client and server folders"
 git branch -M main
 git remote add origin https://github.com/<your-user>/<your-repository>.git
 git push -u origin main
 ```
 
-If `.env` was ever committed, remove it from Git history and rotate its MongoDB and JWT credentials before publishing the repository.
+Confirm `.env`, `client/.env`, and `server/.env` are ignored before committing. If a secret was ever committed, remove it from repository history and rotate it.
 
-## Deploy
+## Render deployment
 
-Deploy the backend as a persistent web service and the Vite frontend as a static site. Render can host both service types. The server supports WebSocket connections and binds to the port supplied by the host.
+### Backend Web Service
 
-1. Push the project to GitHub and connect the repository to Render.
-2. Create a Render **Web Service** for the API. Use build command `npm ci` and start command `npm start`.
-3. Add `MONGODB_URI`, `MONGODB_DB_NAME`, and a new strong `JWT_SECRET` in the backend service's environment settings. Add the backend's permitted outbound IP addresses to the Atlas IP access list.
-4. Create a Render **Static Site** for the same repository. Use build command `npm ci && npm run build` and publish directory `dist`.
-5. Set the static site's `VITE_API_URL` to the deployed backend URL. Set the backend's `CLIENT_ORIGIN` to the static site's exact `https://...onrender.com` origin, then redeploy both services.
-6. Check `https://<backend-url>/api/health`, then sign up and open the app in two separate browsers to confirm chat delivery and reconnection.
+- Root directory: repository root
+- Build command: `npm ci`
+- Start command: `npm start`
+- Environment: `MONGODB_URI`, `MONGODB_DB_NAME`, `JWT_SECRET`, `CLIENT_ORIGIN`, and optional Cloudinary credentials
+- Add the backend service's permitted outbound IP addresses to the Atlas IP access list.
 
-The free Render web service can sleep after inactivity, so the first request may take longer. This project currently uses one backend instance. If you scale Socket.IO to multiple instances, add a Redis adapter and configure sticky sessions at the load balancer.
+### Frontend Static Site
 
-## Remaining work for the full project brief
+- Root directory: repository root
+- Build command: `npm ci && npm run build`
+- Publish directory: `client/dist`
+- Environment variable: `VITE_API_URL=https://<your-backend-service>.onrender.com`
 
-The current implementation is a working feature foundation, not every stretch feature in the brief. Richer mention selection, avatar upload, and a production email or push-notification provider remain. Redis-based multi-instance scaling, automated integration tests, and deployment verification against your own Atlas and Cloudinary accounts also remain.
+Set `CLIENT_ORIGIN` on the backend to the exact deployed frontend origin, then redeploy. Verify `/api/health`, sign in, and test live messages using two browser sessions. The free Render web service may sleep after inactivity. This implementation currently expects one backend instance; multiple instances need a Socket.IO Redis adapter and suitable load-balancer session handling.

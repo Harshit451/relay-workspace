@@ -1,6 +1,6 @@
 import { Search } from "lucide-react";
 
-export default function MessageList({ messageAreaRef, setShowJumpLatest, loadOlderMessages, firstUnreadMessage, jumpToUnread, nextCursor, loadingOlder, busy, messages, searchBusy, search, visibleMessages, formatDate, formatTime, getId, user, retryMessage, reactToMessage, setReplyTarget, togglePin, editMessage, deleteMessage, activeChannel, typingUsers, showJumpLatest, jumpToLatest }) {
+export default function MessageList({ messageAreaRef, setShowJumpLatest, loadOlderMessages, firstUnreadMessage, jumpToUnread, nextCursor, loadingOlder, busy, startupMessage, startupError, messageLoadError, retryWorkspace, retryActiveConversation, messages, searchBusy, search, visibleMessages, formatDate, formatTime, getId, user, retryMessage, reactToMessage, setReplyTarget, togglePin, editMessage, deleteMessage, activeChannel, typingUsers, showJumpLatest, jumpToLatest }) {
   return (
 <div
             className="message-area"
@@ -20,8 +20,24 @@ export default function MessageList({ messageAreaRef, setShowJumpLatest, loadOld
             <div className="date-divider">
               <span>{formatDate(new Date())}</span>
             </div>
-            {busy && messages.length === 0 ? (
-              <div className="loading-state">Loading your workspace…</div>
+            {startupError && messages.length === 0 ? (
+              <div className="loading-state startup-inline" role="status" aria-live="polite">
+                <strong>We couldn’t load your workspace</strong>
+                <p>{startupError}</p>
+                <button className="secondary-button" type="button" onClick={retryWorkspace}>Retry</button>
+              </div>
+            ) : messageLoadError && messages.length === 0 ? (
+              <div className="loading-state startup-inline" role="alert">
+                <strong>Couldn’t load this conversation</strong>
+                <p>{messageLoadError}</p>
+                <button className="secondary-button" type="button" onClick={retryActiveConversation}>Retry</button>
+              </div>
+            ) : busy && messages.length === 0 ? (
+              <div className="loading-state startup-inline" role="status" aria-live="polite">
+                <span className="startup-spinner" />
+                <strong>{startupMessage || "Loading your workspace…"}</strong>
+                <p>Your messages will appear when the server responds.</p>
+              </div>
             ) : searchBusy ? (
               <div className="loading-state">Searching message history…</div>
             ) : visibleMessages.length === 0 ? (
@@ -30,13 +46,16 @@ export default function MessageList({ messageAreaRef, setShowJumpLatest, loadOld
                   <Search size={22} />
                 </div>
                 <h3>
-                  {search ? "No messages found" : "Start the conversation"}
+                  {search ? "No messages found" : activeChannel?.type === "channel" ? `Welcome to #${activeChannel.name}` : "Start the conversation"}
                 </h3>
                 <p>
                   {search
                     ? "Try a different search term."
-                    : "Share an update with your team."}
+                    : activeChannel?.type === "channel"
+                      ? activeChannel.description || "Share an update that belongs in this channel."
+                      : "Share an update with your team."}
                 </p>
+                {!search && activeChannel?.type === "channel" && <small>Use this space to keep team conversations organized and easy to find.</small>}
               </div>
             ) : (
               visibleMessages.map((message, index) => (

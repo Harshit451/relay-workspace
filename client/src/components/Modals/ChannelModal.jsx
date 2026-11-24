@@ -37,12 +37,14 @@ function ChannelModal({ onClose, onCreated }) {
           />
         </label>
         <label>
-          Description
+          Purpose / description
           <textarea
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="What belongs in this channel?"
+            placeholder="What should teammates post here? For example, daily check-ins and team announcements."
             rows="3"
+            maxLength={120}
+            required
           />
         </label>
         {error && <div className="form-error">{error}</div>}

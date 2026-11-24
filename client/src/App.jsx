@@ -56,6 +56,11 @@ function App() {
   const [user, setUser] = useState(null);
   const [profileStatus, setProfileStatus] = useState("Available");
   const [authLoading, setAuthLoading] = useState(true);
+  const [sessionError, setSessionError] = useState("");
+  const [sessionAttempt, setSessionAttempt] = useState(0);
+  const [startupMessage, setStartupMessage] = useState("Checking your session…");
+  const [startupError, setStartupError] = useState("");
+  const [messageLoadError, setMessageLoadError] = useState("");
   const [channels, setChannels] = useState([]);
   const [messages, setMessages] = useState([]);
   const [people, setPeople] = useState([]);
@@ -86,8 +91,7 @@ function App() {
   const activeConversationIdRef = useRef("");
 
   const activeChannel =
-    channels.find((channel) => getId(channel) === activeChannelId) ||
-    channels[0];
+    channels.find((channel) => getId(channel) === activeChannelId) || null;
   const conversationLabel = (conversation) => {
     if (!conversation) return "Messages";
     if (conversation.type === "dm") {
@@ -123,34 +127,92 @@ function App() {
   }, [channels, activeChannelId]);
 
   const loadWorkspace = async (channelId = activeChannelId) => {
-    const channelData = await request("/api/conversations");
-    const nextChannels = channelData.conversations || [];
-    setChannels(nextChannels);
-    const nextChannelId = channelId || getId(nextChannels[0]);
-    if (nextChannelId) setActiveChannelId(nextChannelId);
-    const [peopleData, notificationData, unreadData] = await Promise.all([
-      request("/api/people"),
-      request("/api/notifications"),
-      request("/api/conversations/unread-counts"),
-    ]);
-    setPeople(peopleData.people || []);
-    setNotifications(notificationData.notifications || []);
-    setUnreadCounts(unreadData.counts || {});
+    setStartupError("");
+    setStartupMessage("Loading your workspace…");
+    try {
+      const timeout = { timeoutMs: 70000 };
+      const channelData = await request("/api/conversations", timeout);
+      const nextChannels = channelData.conversations || [];
+      const nextSelection = nextChannels.find((item) => getId(item) === channelId)
+        || nextChannels.find((item) => getId(item) === activeChannelId)
+        || nextChannels.find((item) => item.type === "channel" && item.name === "general")
+        || nextChannels.find((item) => item.type === "channel")
+        || nextChannels[0];
+      const nextChannelId = getId(nextSelection);
+      setChannels(nextChannels);
+      if (nextChannelId !== activeChannelId) {
+        setActiveChannelId(nextChannelId);
+        setMessages([]);
+        setReplyTarget(null);
+        setNextCursor(null);
+      }
+      const [peopleData, notificationData, unreadData] = await Promise.all([
+        request("/api/people", timeout),
+        request("/api/notifications", timeout),
+        request("/api/conversations/unread-counts", timeout),
+      ]);
+      setPeople(peopleData.people || []);
+      setNotifications(notificationData.notifications || []);
+      setUnreadCounts(unreadData.counts || {});
+    } catch (error) {
+      setStartupError(error.message || "Could not load your workspace.");
+      throw error;
+    } finally {
+      setStartupMessage("");
+    }
+  };
+
+  const retryWorkspace = async () => {
+    setBusy(true);
+    setStartupMessage("Retrying workspace connection…");
+    const wakeTimer = window.setTimeout(() => {
+      setStartupMessage("Waking up server (free hosting can take up to 50–60 seconds)…");
+    }, 1800);
+    try {
+      await loadWorkspace();
+    } catch {
+      // The loading card keeps the error and retry action visible.
+    } finally {
+      window.clearTimeout(wakeTimer);
+      setBusy(false);
+    }
   };
 
   useEffect(() => {
+    let active = true;
+    const token = localStorage.getItem("relay_token");
+    if (!token) {
+      setAuthLoading(false);
+      setStartupMessage("");
+      return () => { active = false; };
+    }
+    setAuthLoading(true);
+    setSessionError("");
+    setStartupMessage("Checking your session…");
+    const wakeTimer = window.setTimeout(() => {
+      if (active) setStartupMessage("Waking up server (free hosting can take up to 50–60 seconds)…");
+    }, 1800);
     const restoreSession = async () => {
       try {
-        const data = await request("/api/me");
-        setUser(data.user);
-      } catch {
-        localStorage.removeItem("relay_token");
+        const data = await request("/api/me", { timeoutMs: 70000 });
+        if (active) setUser(data.user);
+      } catch (error) {
+        if (error.status === 401) localStorage.removeItem("relay_token");
+        else if (active) setSessionError(error.message || "Could not reconnect to the server.");
       } finally {
-        setAuthLoading(false);
+        window.clearTimeout(wakeTimer);
+        if (active) {
+          setAuthLoading(false);
+          setStartupMessage("");
+        }
       }
     };
     void restoreSession();
-  }, []);
+    return () => {
+      active = false;
+      window.clearTimeout(wakeTimer);
+    };
+  }, [sessionAttempt]);
 
   useEffect(() => {
     setProfileStatus(user?.status || "Available");
@@ -226,24 +288,32 @@ function App() {
   useEffect(() => {
     if (!user) return undefined;
     setBusy(true);
+    setStartupError("");
+    const wakeTimer = window.setTimeout(() => {
+      setStartupMessage("Waking up server (free hosting can take up to 50–60 seconds)…");
+    }, 1800);
     loadWorkspace()
-      .catch((error) => setNotice(error.message))
-      .finally(() => setBusy(false));
+      .catch(() => {})
+      .finally(() => {
+        window.clearTimeout(wakeTimer);
+        setBusy(false);
+      });
   }, [user?.id]);
 
   useEffect(() => {
     if (!user || !activeChannelId) return undefined;
     let alive = true;
     setShowJumpLatest(false);
+    setMessageLoadError("");
     setBusy(true);
-    request(`/api/channels/${activeChannelId}/messages?limit=30`)
+    request(`/api/channels/${activeChannelId}/messages?limit=30`, { timeoutMs: 70000 })
       .then((data) => {
         if (alive) {
           setMessages(data.messages || []);
           setUnreadCounts((current) => ({ ...current, [activeChannelId]: data.unreadCount || 0 }));
         }
       })
-      .catch((error) => setNotice(error.message))
+      .catch((error) => { if (alive) setMessageLoadError(error.message); })
       .finally(() => { if (alive) setBusy(false); });
     setTypingUsers([]);
     if (!socket) return () => { alive = false; };
@@ -347,6 +417,29 @@ function App() {
       setNotice(error.message);
     } finally {
       setLoadingOlder(false);
+    }
+  };
+
+  const retryActiveConversation = async () => {
+    const conversationId = activeChannelId;
+    if (!conversationId) return;
+    setMessageLoadError("");
+    setBusy(true);
+    setStartupMessage("Reconnecting to your conversation…");
+    const wakeTimer = window.setTimeout(() => {
+      setStartupMessage("Waking up server (free hosting can take up to 50–60 seconds)…");
+    }, 1800);
+    try {
+      const data = await request(`/api/channels/${conversationId}/messages?limit=30`, { timeoutMs: 70000 });
+      if (activeConversationIdRef.current !== conversationId) return;
+      setMessages(data.messages || []);
+      setUnreadCounts((current) => ({ ...current, [conversationId]: data.unreadCount || 0 }));
+    } catch (error) {
+      if (activeConversationIdRef.current === conversationId) setMessageLoadError(error.message);
+    } finally {
+      window.clearTimeout(wakeTimer);
+      setStartupMessage("");
+      setBusy(false);
     }
   };
 
@@ -528,12 +621,39 @@ function App() {
     setUser(null);
     setChannels([]);
     setMessages([]);
+    setPeople([]);
+    setNotifications([]);
+    setUnreadCounts({});
+    setActiveChannelId("");
+    setDraft("");
+    setSearch("");
+    setSearchResults(null);
+    setReplyTarget(null);
     setPanel(null);
+    setSessionError("");
+    setStartupError("");
   };
 
-  if (authLoading)
-    return <div className="loading-page">Preparing your workspace…</div>;
-  if (!user) return <AuthScreen onAuthenticated={setUser} />;
+  if (authLoading) return (
+    <div className="loading-page" role="status" aria-live="polite">
+      <div className="startup-card">
+        <span className="startup-spinner" />
+        <strong>{startupMessage || "Preparing your workspace…"}</strong>
+        <p>Your session will resume as soon as the server responds.</p>
+      </div>
+    </div>
+  );
+  if (sessionError) return (
+    <div className="loading-page">
+      <div className="startup-card startup-error">
+        <strong>We couldn’t reconnect to Relay</strong>
+        <p>{sessionError}</p>
+        <p>Free hosting can take up to 50–60 seconds to wake. Please retry.</p>
+        <button className="primary-button" type="button" onClick={() => setSessionAttempt((attempt) => attempt + 1)}>Retry connection</button>
+      </div>
+    </div>
+  );
+  if (!user) return <AuthScreen onAuthenticated={(nextUser) => { setSessionError(""); setUser(nextUser); }} />;
 
   return (
     <div className="app-shell">
@@ -579,11 +699,23 @@ function App() {
         <button
           className="mobile-toggle"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Open navigation"
+          aria-label={mobileMenuOpen ? "Close navigation" : "Open navigation"}
           type="button"
         >
-          <Menu size={20} />
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
+        {!sidebarOpen && (
+          <button
+            className="sidebar-reopen"
+            type="button"
+            onClick={() => { setSidebarOpen(true); setMobileMenuOpen(true); }}
+            aria-label="Reopen sidebar"
+            title="Reopen sidebar"
+          >
+            <PanelLeftOpen size={18} />
+            <span>Menu</span>
+          </button>
+        )}
       </header>
       <div
         className={`workspace-layout ${sidebarOpen ? "" : "sidebar-collapsed"}`}
@@ -603,7 +735,13 @@ function App() {
               <X size={14} />
             </button>
           )}
-          <MessageList messageAreaRef={messageAreaRef} setShowJumpLatest={setShowJumpLatest} loadOlderMessages={loadOlderMessages} firstUnreadMessage={firstUnreadMessage} jumpToUnread={jumpToUnread} nextCursor={nextCursor} loadingOlder={loadingOlder} busy={busy} messages={messages} searchBusy={searchBusy} search={search} visibleMessages={visibleMessages} formatDate={formatDate} formatTime={formatTime} getId={getId} user={user} retryMessage={retryMessage} reactToMessage={reactToMessage} setReplyTarget={setReplyTarget} togglePin={togglePin} editMessage={editMessage} deleteMessage={deleteMessage} activeChannel={activeChannel} typingUsers={typingUsers} showJumpLatest={showJumpLatest} jumpToLatest={jumpToLatest} />
+          {startupError && messages.length > 0 && (
+            <div className="workspace-retry-banner" role="alert">
+              <span>Some workspace details did not load: {startupError}</span>
+              <button type="button" onClick={retryWorkspace}>Retry</button>
+            </div>
+          )}
+          <MessageList messageAreaRef={messageAreaRef} setShowJumpLatest={setShowJumpLatest} loadOlderMessages={loadOlderMessages} firstUnreadMessage={firstUnreadMessage} jumpToUnread={jumpToUnread} nextCursor={nextCursor} loadingOlder={loadingOlder} busy={busy} startupMessage={startupMessage} startupError={startupError} messageLoadError={messageLoadError} retryWorkspace={retryWorkspace} retryActiveConversation={retryActiveConversation} messages={messages} searchBusy={searchBusy} search={search} visibleMessages={visibleMessages} formatDate={formatDate} formatTime={formatTime} getId={getId} user={user} retryMessage={retryMessage} reactToMessage={reactToMessage} setReplyTarget={setReplyTarget} togglePin={togglePin} editMessage={editMessage} deleteMessage={deleteMessage} activeChannel={activeChannel} typingUsers={typingUsers} showJumpLatest={showJumpLatest} jumpToLatest={jumpToLatest} />
           <MessageComposer replyTarget={replyTarget} setReplyTarget={setReplyTarget} pendingUploads={pendingUploads} removePendingUpload={removePendingUpload} uploadInput={uploadInput} uploading={uploading} uploadAttachment={uploadAttachment} draft={draft} setDraft={setDraft} notifyTyping={notifyTyping} activeChannel={activeChannel} conversationLabel={conversationLabel} sendMessage={sendMessage} socketStatus={socketStatus} />
         </main>
         <aside className="activity-panel">
@@ -834,8 +972,9 @@ function App() {
             </div>
           ) : (
             <div className="settings-content">
-              <p className="modal-copy">
-                Keep this channel focused and easy to scan for everyone.
+              <p className="eyebrow">{activeChannel?.type === "channel" ? "Channel purpose" : "Conversation details"}</p>
+              <p className="modal-copy channel-description-detail">
+                {activeChannel?.description || "No description has been added yet."}
               </p>
               {activeChannel?.type === "group" && (
                 <button className="secondary-button" type="button" onClick={() => setPanel("members")}>

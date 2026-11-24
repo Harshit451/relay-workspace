@@ -21,6 +21,9 @@ export default function ChatHeader({ activeChannel, socketStatus, search, setSea
                   {activeChannel?.description ||
                     "Select a channel to start talking."}
                 </p>
+                {activeChannel?.type === "channel" && (
+                  <button className="channel-details-link" type="button" onClick={() => setPanel("channel-options")}>Channel details</button>
+                )}
               </div>
             </div>
             <div className="conversation-actions">

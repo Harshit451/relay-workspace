@@ -7,23 +7,28 @@ function AuthScreen({ onAuthenticated }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [waitingForServer, setWaitingForServer] = useState(false);
   const [error, setError] = useState("");
 
   const submit = async (event) => {
-    event.preventDefault();
+    event?.preventDefault();
     setBusy(true);
     setError("");
+    setWaitingForServer(false);
+    const wakeTimer = window.setTimeout(() => setWaitingForServer(true), 1800);
     try {
       const data = await request(
         `/api/auth/${mode === "login" ? "login" : "signup"}`,
-        { method: "POST", body: JSON.stringify({ name, email, password }) },
+        { method: "POST", body: JSON.stringify({ name, email, password }), timeoutMs: 70000 },
       );
       localStorage.setItem("relay_token", data.token);
       onAuthenticated(data.user);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
+      window.clearTimeout(wakeTimer);
       setBusy(false);
+      setWaitingForServer(false);
     }
   };
 
@@ -114,10 +119,15 @@ function AuthScreen({ onAuthenticated }) {
                 required
               />
             </label>
-            {error && <div className="form-error">{error}</div>}
+            {error && (
+              <>
+                <div className="form-error" role="alert">{error}</div>
+                <button className="secondary-button auth-retry" type="button" onClick={() => void submit()}>Retry connection</button>
+              </>
+            )}
             <button className="primary-button" type="submit" disabled={busy}>
               {busy
-                ? "Please wait…"
+                ? waitingForServer ? "Waking server…" : "Connecting…"
                 : mode === "login"
                   ? "Sign in"
                   : "Create account"}

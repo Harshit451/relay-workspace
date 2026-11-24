@@ -1,5 +1,5 @@
 export function registerRoutes(router, dependencies) {
-  const { mongoose, User, Conversation, Message, Notification, Invite, auth, safeAsync, text, email, asUser, room, userRoom, io } = dependencies;
+  const { mongoose, User, Conversation, Message, Notification, Invite, auth, safeAsync, text, email, asUser, room, userRoom, io, colors } = dependencies;
   router.get('/api/channels', auth, safeAsync(async (_req, res) => {
     res.json({ channels: await Conversation.find({ type: 'channel' }).sort({ sortOrder: 1, createdAt: 1 }).lean() });
   }));

@@ -1,5 +1,5 @@
 export function registerRoutes(router, dependencies) {
-  const { mongoose, Message, auth, canAccess, createMessage, asMessage, room, io, cloudinary } = dependencies;
+  const { mongoose, Message, auth, canAccess, createMessage, asMessage, room, io, cloudinary, text } = dependencies;
   router.post('/api/channels/:channelId/messages', auth, async (req, res) => {
     try {
       const conversation = await canAccess(req.params.channelId, req.user._id);

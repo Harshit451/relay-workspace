@@ -1,5 +1,5 @@
 export function registerRoutes(router, dependencies) {
-  const { User, Notification, Invite, auth, safeAsync, email } = dependencies;
+  const { User, Notification, Invite, auth, safeAsync, email, asUser } = dependencies;
   router.get('/api/people', auth, safeAsync(async (_req, res) => {
     res.json({ people: (await User.find().sort({ name: 1 }).lean()).map(asUser) });
   }));

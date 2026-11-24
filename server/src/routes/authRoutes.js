@@ -1,5 +1,5 @@
 export function registerRoutes(router, dependencies) {
-  const { mongoose, bcrypt, jwt, secret, User, asUser, text, email, initials, colors, auth, safeAsync } = dependencies;
+  const { mongoose, bcrypt, jwt, secret, User, asUser, text, email, initials, colors, auth, safeAsync, io } = dependencies;
   router.get('/api/health', (_req, res) => res.json({ ok: true, database: mongoose.connection.readyState === 1 }));
   router.post('/api/auth/signup', async (req, res) => {
     try {

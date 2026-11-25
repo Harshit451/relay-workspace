@@ -2,10 +2,10 @@ export function registerRoutes(router, dependencies) {
   const { mongoose, Conversation, User, auth, room, userRoom, io } = dependencies;
   router.post('/api/conversations/:conversationId/members', auth, async (req, res) => {
     try {
-      const conversation = await Conversation.findById(req.params.conversationId);
+      const conversation = await Conversation.findOne({ _id: req.params.conversationId, workspaceId: req.user.workspaceId });
       if (!conversation || conversation.type === 'channel') return res.status(404).json({ message: 'That group is not available.' });
       if (!conversation.adminIds.some((id) => String(id) === String(req.user._id))) return res.status(403).json({ message: 'Only group admins can add members.' });
-      if (!mongoose.isValidObjectId(req.body.userId) || !await User.exists({ _id: req.body.userId })) return res.status(404).json({ message: 'That person was not found.' });
+      if (!mongoose.isValidObjectId(req.body.userId) || !await User.exists({ _id: req.body.userId, workspaceId: req.user.workspaceId })) return res.status(404).json({ message: 'That person was not found in this workspace.' });
       await Conversation.updateOne({ _id: conversation._id }, { $addToSet: { memberIds: req.body.userId } });
       const updated = await Conversation.findById(conversation._id).lean();
       io.in(userRoom(req.body.userId)).socketsJoin(room(conversation._id));
@@ -18,7 +18,7 @@ export function registerRoutes(router, dependencies) {
   });
   router.patch('/api/conversations/:conversationId/members/:userId/role', auth, async (req, res) => {
     try {
-      const conversation = await Conversation.findById(req.params.conversationId);
+      const conversation = await Conversation.findOne({ _id: req.params.conversationId, workspaceId: req.user.workspaceId });
       if (!conversation || conversation.type !== 'group') return res.status(404).json({ message: 'That group is not available.' });
       if (!conversation.adminIds.some((id) => String(id) === String(req.user._id))) return res.status(403).json({ message: 'Only group admins can change roles.' });
       if (!conversation.memberIds.some((id) => String(id) === String(req.params.userId))) return res.status(404).json({ message: 'That person is not a group member.' });
@@ -39,7 +39,7 @@ export function registerRoutes(router, dependencies) {
   });
   router.delete('/api/conversations/:conversationId/members/:userId', auth, async (req, res) => {
     try {
-      const conversation = await Conversation.findById(req.params.conversationId);
+      const conversation = await Conversation.findOne({ _id: req.params.conversationId, workspaceId: req.user.workspaceId });
       if (!conversation || conversation.type === 'channel') return res.status(404).json({ message: 'That group is not available.' });
       const admin = conversation.adminIds.some((id) => String(id) === String(req.user._id));
       if (!admin && String(req.params.userId) !== String(req.user._id)) return res.status(403).json({ message: 'You cannot remove that member.' });

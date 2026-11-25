@@ -1,6 +1,6 @@
 # Relay team chat
 
-Relay is a real-time team chat built with React, Vite, Express, Socket.IO, MongoDB, and Cloudinary. The root npm scripts use concurrently so local development and production builds run from the repository root, with dedicated manifests in `client/` and `server/`.
+Relay is a real-time team chat built with React, Vite, Express, Socket.IO, MongoDB, and Cloudinary. Each account belongs to a workspace; new signups get a private workspace unless they use an email with a pending invitation. Root npm scripts use concurrently, with dedicated manifests in `client/` and `server/`.
 
 ## Project structure
 
@@ -12,7 +12,7 @@ Relay is a real-time team chat built with React, Vite, Express, Socket.IO, Mongo
 │   │   ├── lib/            # Shared client helpers
 │   │   ├── services/       # REST API and Socket.IO clients
 │   │   └── styles/         # App styles
-│   ├── .env.example
+│   ├── .env.example        # Vite API URL template
 │   └── package.json
 ├── server/                 # Express + Socket.IO API
 │   ├── src/
@@ -24,9 +24,8 @@ Relay is a real-time team chat built with React, Vite, Express, Socket.IO, Mongo
 │   │   ├── socket/          # JWT-authenticated Socket.IO handlers
 │   │   ├── utils/           # Starter data seeding
 │   │   └── index.js         # HTTP server composition and startup
-│   ├── .env.example
 │   └── package.json
-├── .env.example             # Root-level environment template for local server startup
+├── .env.example             # Root-level server environment template
 ├── package.json            # Root scripts and shared dependency installation
 └── README.md
 ```
@@ -49,7 +48,11 @@ npm start         # starts the API/socket server
 5. Add Cloudinary credentials to `.env` if you want file attachments.
 6. Run `npm run dev` from the root and open `http://localhost:5173`.
 
-You can also run `npm run dev --prefix server` or `npm run dev --prefix client` independently after installing dependencies at the repository root. Each app has its own package manifest; the root manifest keeps `npm ci`, `npm run dev`, `npm run build`, and `npm start` compatible with local development and Render. Root `.env` is used by the root scripts.
+You can also run `npm run dev --prefix server` or `npm run dev --prefix client` independently after installing dependencies at the repository root. The root manifest is required for Render's root-level `npm ci` and start/build scripts; the client and server manifests describe their respective apps. Root `.env` is used by the root scripts. For a teammate to join an existing workspace, invite their email and have them sign up or sign in with that same email.
+
+On the next server startup, accounts and conversations from before workspace isolation are assigned to a shared legacy workspace. Their messages are retained. New signups are separate unless they accept an invitation.
+
+Root `.env.example` and `client/.env.example` configure different parts of the app: server secrets and database settings belong in root `.env`; the Vite API URL belongs in `client/.env`. Never commit either real `.env` file.
 
 ## Included functionality
 

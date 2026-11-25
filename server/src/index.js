@@ -46,10 +46,12 @@ configureCloudinary();
 const colors = ['#79b8a2', '#e8a15b', '#7f9cf5', '#d77bb2', '#6a9fe8', '#c1a46f'];
 const room = (id) => 'conversation:' + String(id);
 const userRoom = (id) => 'user:' + String(id);
+const workspaceRoom = (id) => 'workspace:' + String(id);
 const email = (value) => String(value || '').trim().toLowerCase();
 const initials = (name) => String(name || 'User').trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'U';
 const asUser = (user) => ({
   id: String(user._id), name: user.name, email: user.email, initials: user.initials,
+  workspaceId: String(user.workspaceId || ''), workspaceName: user.workspaceName || 'My workspace',
   avatarColor: user.avatarColor, avatarUrl: user.avatarUrl || '',
   status: user.status || 'Available', presence: user.presence || 'offline',
   lastSeenAt: user.lastSeenAt || null,
@@ -64,9 +66,10 @@ const text = (value, label, max) => {
   return result;
 };
 const safeAsync = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
-const canAccess = async (id, userId) => {
+const canAccess = async (id, userId, workspaceId) => {
   if (!mongoose.isValidObjectId(id)) return null;
-  const conversation = await Conversation.findById(id);
+  if (!workspaceId || !mongoose.isValidObjectId(workspaceId)) return null;
+  const conversation = await Conversation.findOne({ _id: id, workspaceId });
   if (!conversation) return null;
   if (conversation.type !== 'channel' && !conversation.memberIds.some((member) => String(member) === String(userId))) return null;
   return conversation;
@@ -74,17 +77,31 @@ const canAccess = async (id, userId) => {
 const createMessage = createMessageController({ mongoose, Message, Upload, User, Notification, io, userRoom });
 const auth = createAuthMiddleware({ jwt, secret, User });
 
-app.use(createApiRouter({ express, mongoose, bcrypt, jwt, secret, User, Conversation, Message, Notification, Invite, Upload, asUser, asMessage, text, email, initials, colors, auth, safeAsync, canAccess, createMessage, room, userRoom, io, cloudinary, uploadFile }));
+app.use(createApiRouter({ express, mongoose, bcrypt, jwt, secret, User, Conversation, Message, Notification, Invite, Upload, asUser, asMessage, text, email, initials, colors, auth, safeAsync, canAccess, createMessage, room, userRoom, workspaceRoom, io, cloudinary, uploadFile, seedStarterChannels }));
 
 app.use(handleError);
 
-registerSocketHandlers({ io, jwt, secret, User, asUser, userRoom, room, canAccess, createMessage, asMessage, mongoose, Message });
+registerSocketHandlers({ io, jwt, secret, User, asUser, userRoom, room, workspaceRoom, canAccess, createMessage, asMessage, mongoose, Message });
 
 const start = async () => {
   await connectDatabase({ uri, dbName });
   await Conversation.updateMany({ type: { $exists: false } }, { $set: { type: 'channel' } });
+  const unassignedUsers = await User.find({ workspaceId: null }).sort({ createdAt: 1 }).select('_id').lean();
+  if (unassignedUsers.length) {
+    const legacyWorkspaceId = unassignedUsers[0]._id;
+    await User.updateMany(
+      { workspaceId: null },
+      { $set: { workspaceId: legacyWorkspaceId, workspaceName: 'Relay legacy workspace' } },
+    );
+    await Conversation.updateMany({ workspaceId: null }, { $set: { workspaceId: legacyWorkspaceId } });
+  }
+  await User.updateMany(
+    { $or: [{ workspaceName: null }, { workspaceName: '' }] },
+    { $set: { workspaceName: 'Relay legacy workspace' } },
+  );
   await User.updateMany({ presence: 'online' }, { $set: { presence: 'offline', lastSeenAt: new Date() } });
-  await seedStarterChannels(Conversation);
+  const workspaceIds = await User.distinct('workspaceId', { workspaceId: { $ne: null } });
+  await Promise.all(workspaceIds.map((workspaceId) => seedStarterChannels(Conversation, workspaceId)));
   server.listen(port, '0.0.0.0', () => console.log('API and Socket.IO listening on port ' + port));
 };
 start().catch((error) => {

@@ -2,7 +2,7 @@ export function registerRoutes(router, dependencies) {
   const { mongoose, Message, auth, canAccess, room, io } = dependencies;
   router.get('/api/channels/:channelId/messages', auth, async (req, res) => {
     try {
-      const conversation = await canAccess(req.params.channelId, req.user._id);
+      const conversation = await canAccess(req.params.channelId, req.user._id, req.user.workspaceId);
       if (!conversation) return res.status(404).json({ message: 'That conversation is not available.' });
       const limit = Math.max(1, Math.min(Number(req.query.limit) || 30, 100));
       const query = { channelId: conversation._id, deletedAt: null };

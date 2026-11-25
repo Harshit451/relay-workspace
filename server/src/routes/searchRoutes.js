@@ -4,7 +4,7 @@ export function registerRoutes(router, dependencies) {
     try {
       const queryText = String(req.query.q || '').trim().slice(0, 100);
       if (!queryText) return res.json({ messages: [] });
-      const conversations = await Conversation.find({ $or: [{ type: 'channel' }, { memberIds: req.user._id }] }).select('_id name');
+      const conversations = await Conversation.find({ workspaceId: req.user.workspaceId, $or: [{ type: 'channel' }, { memberIds: req.user._id }] }).select('_id name');
       const allowedIds = conversations.map((conversation) => conversation._id);
       const escaped = queryText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const messages = await Message.find({

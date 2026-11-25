@@ -64,13 +64,13 @@ function AuthScreen({ onAuthenticated }) {
             >
               NW
             </span>
-            <span>Northstar Studio is in sync</span>
+            <span>A focused home for your team</span>
           </div>
         </div>
       </div>
       <div className="auth-card">
         <div className="auth-card-inner">
-          <p className="eyebrow">Northstar Studio</p>
+          <p className="eyebrow">Relay workspace</p>
           <h2>
             {mode === "login"
               ? "Welcome back"

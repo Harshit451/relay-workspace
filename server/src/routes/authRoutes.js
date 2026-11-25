@@ -1,5 +1,5 @@
 export function registerRoutes(router, dependencies) {
-  const { mongoose, bcrypt, jwt, secret, User, asUser, text, email, initials, colors, auth, safeAsync, io } = dependencies;
+  const { mongoose, bcrypt, jwt, secret, User, Conversation, Invite, Notification, asUser, text, email, initials, colors, auth, safeAsync, io, workspaceRoom, seedStarterChannels } = dependencies;
   router.get('/api/health', (_req, res) => res.json({ ok: true, database: mongoose.connection.readyState === 1 }));
   router.post('/api/auth/signup', async (req, res) => {
     try {
@@ -9,10 +9,18 @@ export function registerRoutes(router, dependencies) {
       if (!/^\S+@\S+\.\S+$/.test(userEmail) || password.length < 8) {
         return res.status(400).json({ message: 'Use a valid email and a password with at least 8 characters.' });
       }
+      const invitation = await Invite.findOne({ email: userEmail, acceptedAt: null }).sort({ createdAt: -1 });
+      const inviter = invitation ? await User.findById(invitation.invitedBy).select('workspaceId workspaceName') : null;
+      const workspaceId = invitation?.workspaceId || inviter?.workspaceId;
       const user = await User.create({
         name, email: userEmail, passwordHash: await bcrypt.hash(password, 12),
         initials: initials(name), avatarColor: colors[(await User.countDocuments()) % colors.length],
+        workspaceName: inviter?.workspaceName || `${name}'s workspace`,
       });
+      user.workspaceId = workspaceId || user._id;
+      await user.save();
+      if (invitation) await Invite.updateOne({ _id: invitation._id }, { $set: { acceptedAt: new Date(), workspaceId: user.workspaceId } });
+      await seedStarterChannels(Conversation, user.workspaceId);
       return res.status(201).json({ user: asUser(user), token: jwt.sign({ sub: String(user._id) }, secret, { expiresIn: '7d' }) });
     } catch (error) {
       if (error.code === 11000) return res.status(409).json({ message: 'An account already uses that email.' });
@@ -25,6 +33,20 @@ export function registerRoutes(router, dependencies) {
       if (!user || !await bcrypt.compare(String(req.body.password || ''), user.passwordHash)) {
         return res.status(401).json({ message: 'Email or password is incorrect.' });
       }
+      const invitation = await Invite.findOne({ email: user.email, acceptedAt: null }).sort({ createdAt: -1 });
+      if (invitation) {
+        const inviter = await User.findById(invitation.invitedBy).select('workspaceId workspaceName');
+        if (invitation.workspaceId || inviter?.workspaceId) {
+          const invitedWorkspaceId = invitation.workspaceId || inviter.workspaceId;
+          const changedWorkspace = String(user.workspaceId) !== String(invitedWorkspaceId);
+          user.workspaceId = invitedWorkspaceId;
+          user.workspaceName = inviter?.workspaceName || user.workspaceName;
+          await user.save();
+          if (changedWorkspace) await Notification.deleteMany({ userId: user._id });
+          await Invite.updateOne({ _id: invitation._id }, { $set: { acceptedAt: new Date(), workspaceId: user.workspaceId } });
+          await seedStarterChannels(Conversation, user.workspaceId);
+        }
+      }
       return res.json({ user: asUser(user), token: jwt.sign({ sub: String(user._id) }, secret, { expiresIn: '7d' }) });
     } catch {
       return res.status(500).json({ message: 'We could not sign you in right now.' });
@@ -36,7 +58,7 @@ export function registerRoutes(router, dependencies) {
     if (req.body.status !== undefined) req.user.status = String(req.body.status).trim().slice(0, 120);
     if (req.body.avatarUrl !== undefined) req.user.avatarUrl = String(req.body.avatarUrl).trim().slice(0, 1000);
     await req.user.save();
-    io.emit('presence:update', asUser(req.user));
+    io.to(workspaceRoom(req.user.workspaceId)).emit('presence:update', asUser(req.user));
     return res.json({ user: asUser(req.user) });
   }));
 }

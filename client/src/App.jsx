@@ -112,6 +112,7 @@ function App() {
   const unreadCount = notifications.filter(
     (notification) => !notification.read,
   ).length;
+  const teammates = people.filter((person) => getId(person) !== getId(user));
   const firstUnreadMessage = messages.find((message) =>
     message.authorId !== getId(user) && !(message.readBy || []).map(String).includes(getId(user)),
   );
@@ -667,8 +668,8 @@ function App() {
           type="button"
           onClick={() => setPanel("settings")}
         >
-          <span className="workspace-avatar">N</span>
-          <span>Northstar Studio</span>
+          <span className="workspace-avatar">{(user.workspaceName || "My workspace").slice(0, 1).toUpperCase()}</span>
+          <span>{user.workspaceName || "My workspace"}</span>
           <ChevronDown size={15} />
         </button>
         <div className="topbar-actions">
@@ -698,29 +699,30 @@ function App() {
         </div>
         <button
           className="mobile-toggle"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label={mobileMenuOpen ? "Close navigation" : "Open navigation"}
+          onClick={() => {
+            if (window.matchMedia("(max-width: 760px)").matches) setMobileMenuOpen((open) => !open);
+            else setSidebarOpen((open) => !open);
+          }}
+          aria-label={window.matchMedia("(max-width: 760px)").matches
+            ? mobileMenuOpen ? "Close navigation" : "Open navigation"
+            : sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
+          title={window.matchMedia("(max-width: 760px)").matches
+            ? mobileMenuOpen ? "Close navigation" : "Open navigation"
+            : sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
           type="button"
         >
-          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          {window.matchMedia("(max-width: 760px)").matches
+            ? mobileMenuOpen ? <X size={20} /> : <Menu size={20} />
+            : sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+          <span className="sidebar-toggle-label">
+            {sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          </span>
         </button>
-        {!sidebarOpen && (
-          <button
-            className="sidebar-reopen"
-            type="button"
-            onClick={() => { setSidebarOpen(true); setMobileMenuOpen(true); }}
-            aria-label="Reopen sidebar"
-            title="Reopen sidebar"
-          >
-            <PanelLeftOpen size={18} />
-            <span>Menu</span>
-          </button>
-        )}
       </header>
       <div
         className={`workspace-layout ${sidebarOpen ? "" : "sidebar-collapsed"}`}
       >
-        <Sidebar mobileMenuOpen={mobileMenuOpen} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} messages={messages} setPanel={setPanel} channels={channels} activeChannelId={activeChannelId} selectChannel={selectChannel} unreadCounts={unreadCounts} people={people} conversationLabel={conversationLabel} />
+        <Sidebar mobileMenuOpen={mobileMenuOpen} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} setMobileMenuOpen={setMobileMenuOpen} userId={getId(user)} messages={messages} setPanel={setPanel} channels={channels} activeChannelId={activeChannelId} selectChannel={selectChannel} unreadCounts={unreadCounts} people={people} conversationLabel={conversationLabel} />
 
         <main className="main-panel">
           <ChatHeader activeChannel={activeChannel} socketStatus={socketStatus} search={search} setSearch={setSearch} setPanel={setPanel} conversationLabel={conversationLabel} />
@@ -779,7 +781,9 @@ function App() {
               </button>
             </div>
             <div className="activity-list">
-              {people.slice(0, 3).map((person) => (
+              {teammates.length === 0 ? (
+                <div className="activity-empty">You’re the first member here. Invite teammates to start collaborating.</div>
+              ) : teammates.slice(0, 3).map((person) => (
                 <div className="activity-item" key={person.id || person._id}>
                   <span
                     className="activity-avatar"
@@ -798,11 +802,11 @@ function App() {
           <div className="people-card">
             <div className="people-top">
               <div>
-                <span className="people-count">{people.length}</span>
-                <p>teammates in workspace</p>
+                <span className="people-count">{teammates.length}</span>
+                <p>{teammates.length === 1 ? "teammate in workspace" : "teammates in workspace"}</p>
               </div>
               <div className="avatar-stack">
-                {people.slice(0, 3).map((person) => (
+                {teammates.slice(0, 3).map((person) => (
                   <span
                     key={person.id || person._id}
                     className="avatar-stack-item"
@@ -811,9 +815,9 @@ function App() {
                     {person.initials}
                   </span>
                 ))}
-                {people.length > 3 && (
+                {teammates.length > 3 && (
                   <span className="avatar-stack-item more">
-                    +{people.length - 3}
+                    +{teammates.length - 3}
                   </span>
                 )}
               </div>
@@ -960,7 +964,7 @@ function App() {
               <button className="secondary-button" type="button" onClick={saveProfileStatus}>Save status</button>
               <div className="settings-row">
                 <span>Workspace</span>
-                <strong>Northstar Studio</strong>
+                <strong>{user.workspaceName || "My workspace"}</strong>
               </div>
               <div className="settings-row">
                 <span>Updates</span>

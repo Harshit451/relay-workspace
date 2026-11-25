@@ -3,7 +3,7 @@ import { getId } from "../lib/format.js";
 
 const iconForChannel = (icon) => icon === "palette" ? Palette : icon === "terminal" ? Terminal : Sparkles;
 
-export default function Sidebar({ mobileMenuOpen, sidebarOpen, setSidebarOpen, messages, setPanel, channels, activeChannelId, selectChannel, unreadCounts, people, conversationLabel }) {
+export default function Sidebar({ mobileMenuOpen, sidebarOpen, setSidebarOpen, setMobileMenuOpen, userId, messages, setPanel, channels, activeChannelId, selectChannel, unreadCounts, people, conversationLabel }) {
   return (
 <aside className={`sidebar ${mobileMenuOpen ? "mobile-visible" : ""}`}>
           <div className="sidebar-heading">
@@ -14,8 +14,11 @@ export default function Sidebar({ mobileMenuOpen, sidebarOpen, setSidebarOpen, m
             <button
               className="icon-button subtle"
               type="button"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              aria-label="Toggle sidebar"
+              onClick={() => {
+                if (window.matchMedia("(max-width: 760px)").matches) setMobileMenuOpen(false);
+                else setSidebarOpen((open) => !open);
+              }}
+              aria-label="Close sidebar"
             >
               {sidebarOpen ? (
                 <PanelLeftClose size={18} />
@@ -101,7 +104,7 @@ export default function Sidebar({ mobileMenuOpen, sidebarOpen, setSidebarOpen, m
           </div>
           <div className="sidebar-footer">
             <div className="online-indicator">
-              <span /> {people.filter((person) => person.presence === "online").length} teammates online
+              <span /> {people.filter((person) => getId(person) !== userId && person.presence === "online").length} teammates online
             </div>
             <button
               className="nav-item"

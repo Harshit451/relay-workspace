@@ -22,7 +22,6 @@ import {
   MoreHorizontal,
   Paperclip,
   Palette,
-  PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Search,
@@ -698,22 +697,15 @@ function App() {
           </button>
         </div>
         <button
-          className={`mobile-toggle ${sidebarOpen ? "sidebar-open" : ""} ${mobileMenuOpen ? "drawer-open" : ""}`}
+          className={`mobile-toggle ${mobileMenuOpen ? "drawer-open" : ""}`}
           onClick={() => {
-            if (window.matchMedia("(max-width: 760px)").matches) setMobileMenuOpen((open) => !open);
-            else setSidebarOpen((open) => !open);
+            setMobileMenuOpen((open) => !open);
           }}
-          aria-label={window.matchMedia("(max-width: 760px)").matches
-            ? mobileMenuOpen ? "Close navigation" : "Open navigation"
-            : sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
-          title={window.matchMedia("(max-width: 760px)").matches
-            ? mobileMenuOpen ? "Close navigation" : "Open navigation"
-            : sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
+          aria-label={mobileMenuOpen ? "Close navigation" : "Open navigation"}
+          title={mobileMenuOpen ? "Close navigation" : "Open navigation"}
           type="button"
         >
-          {window.matchMedia("(max-width: 760px)").matches
-            ? mobileMenuOpen ? <X size={20} /> : <Menu size={20} />
-            : sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           <span className="sidebar-toggle-label">
             {mobileMenuOpen ? "Close navigation" : sidebarOpen ? "Hide sidebar" : "Show sidebar"}
           </span>
@@ -722,6 +714,7 @@ function App() {
       <div
         className={`workspace-layout ${sidebarOpen ? "" : "sidebar-collapsed"}`}
       >
+        {!sidebarOpen && <button className="sidebar-reopen icon-button subtle" type="button" onClick={() => setSidebarOpen(true)} aria-label="Open sidebar" title="Open sidebar"><PanelLeftOpen size={18} /></button>}
         <Sidebar mobileMenuOpen={mobileMenuOpen} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} setMobileMenuOpen={setMobileMenuOpen} userId={getId(user)} messages={messages} setPanel={setPanel} channels={channels} activeChannelId={activeChannelId} selectChannel={selectChannel} unreadCounts={unreadCounts} people={people} conversationLabel={conversationLabel} />
 
         <main className="main-panel">

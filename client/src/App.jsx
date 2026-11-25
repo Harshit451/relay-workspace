@@ -698,7 +698,7 @@ function App() {
           </button>
         </div>
         <button
-          className="mobile-toggle"
+          className={`mobile-toggle ${sidebarOpen ? "sidebar-open" : ""} ${mobileMenuOpen ? "drawer-open" : ""}`}
           onClick={() => {
             if (window.matchMedia("(max-width: 760px)").matches) setMobileMenuOpen((open) => !open);
             else setSidebarOpen((open) => !open);
@@ -715,7 +715,7 @@ function App() {
             ? mobileMenuOpen ? <X size={20} /> : <Menu size={20} />
             : sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
           <span className="sidebar-toggle-label">
-            {sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            {mobileMenuOpen ? "Close navigation" : sidebarOpen ? "Hide sidebar" : "Show sidebar"}
           </span>
         </button>
       </header>

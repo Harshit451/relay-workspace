@@ -172,6 +172,11 @@ button {
   padding: 0 9px;
   margin-left: 14px;
 }
+@media (min-width: 761px) {
+  .mobile-toggle.sidebar-open {
+    display: none;
+  }
+}
 .sidebar-toggle-label {
   font-size: 11px;
   white-space: nowrap;
@@ -1533,6 +1538,9 @@ p {
     width: 34px;
     padding: 0;
     margin-left: auto;
+  }
+  .mobile-toggle.drawer-open {
+    display: none;
   }
   .sidebar-toggle-label {
     display: none;

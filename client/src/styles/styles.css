@@ -1003,6 +1003,9 @@ p {
   border-color: #4c6684;
   background: #203147;
 }
+.invite-code-row { display: flex; gap: 8px; }
+.invite-code-row input { min-width: 0; flex: 1; font-weight: 700; letter-spacing: 0.12em; }
+.invite-code-row button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
 .loading-state,
 .empty-state {
   display: grid;

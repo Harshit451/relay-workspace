@@ -12,6 +12,7 @@ import ChannelModal from "./components/Modals/ChannelModal.jsx";
 import MembersModal from "./components/Modals/MembersModal.jsx";
 import GroupModal from "./components/Modals/GroupModal.jsx";
 import InviteModal from "./components/Modals/InviteModal.jsx";
+import WorkspaceModal from "./components/Modals/WorkspaceModal.jsx";
 import {
   Bell,
   ChevronDown,
@@ -665,7 +666,7 @@ function App() {
         <button
           className="workspace-switcher"
           type="button"
-          onClick={() => setPanel("settings")}
+          onClick={() => setPanel("workspaces")}
         >
           <span className="workspace-avatar">{(user.workspaceName || "My workspace").slice(0, 1).toUpperCase()}</span>
           <span>{user.workspaceName || "My workspace"}</span>
@@ -882,7 +883,8 @@ function App() {
           </button>
         </Modal>
       )}
-      {panel === "invite" && <InviteModal onClose={() => setPanel(null)} />}
+      {panel === "invite" && <InviteModal onClose={() => setPanel(null)} onInvited={() => loadWorkspace(activeChannelId)} />}
+      {panel === "workspaces" && <WorkspaceModal onClose={() => setPanel(null)} onJoined={async (nextUser) => { setUser(nextUser); setChannels([]); setMessages([]); setActiveChannelId(""); setPanel(null); await loadWorkspace(""); }} />}
       {panel === "notifications" && (
         <Modal title="Notifications" onClose={() => setPanel(null)}>
           <div className="notification-list">

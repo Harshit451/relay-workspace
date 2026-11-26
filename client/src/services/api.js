@@ -5,6 +5,8 @@ export const request = async (path, options = {}) => {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   const token = localStorage.getItem("relay_token");
+  const userId = localStorage.getItem("relay_user_id");
+  const activeWorkspaceId = userId && localStorage.getItem(`relay_active_workspace_${userId}`);
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...fetchOptions,
@@ -12,6 +14,7 @@ export const request = async (path, options = {}) => {
       headers: {
         ...(fetchOptions.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(activeWorkspaceId ? { "X-Workspace-Id": activeWorkspaceId } : {}),
         ...(fetchOptions.headers || {}),
       },
     });

@@ -5,7 +5,7 @@ export function registerRoutes(router, dependencies) {
       const conversation = await Conversation.findOne({ _id: req.params.conversationId, workspaceId: req.user.workspaceId });
       if (!conversation || conversation.type === 'channel') return res.status(404).json({ message: 'That group is not available.' });
       if (!conversation.adminIds.some((id) => String(id) === String(req.user._id))) return res.status(403).json({ message: 'Only group admins can add members.' });
-      if (!mongoose.isValidObjectId(req.body.userId) || !await User.exists({ _id: req.body.userId, workspaceId: req.user.workspaceId })) return res.status(404).json({ message: 'That person was not found in this workspace.' });
+      if (!mongoose.isValidObjectId(req.body.userId) || !await User.exists({ _id: req.body.userId, $or: [{ workspaceIds: req.user.workspaceId }, { workspaceId: req.user.workspaceId }] })) return res.status(404).json({ message: 'That person was not found in this workspace.' });
       await Conversation.updateOne({ _id: conversation._id }, { $addToSet: { memberIds: req.body.userId } });
       const updated = await Conversation.findById(conversation._id).lean();
       io.in(userRoom(req.body.userId)).socketsJoin(room(conversation._id));

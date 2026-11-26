@@ -1,11 +1,13 @@
 export function registerRoutes(router, dependencies) {
-  const { mongoose, Message, auth, canAccess, createMessage, asMessage, room, io, cloudinary, text } = dependencies;
+  const { mongoose, Message, auth, canAccess, createMessage, asMessage, room, userRoom, io, cloudinary, text } = dependencies;
   router.post('/api/channels/:channelId/messages', auth, async (req, res) => {
     try {
       const conversation = await canAccess(req.params.channelId, req.user._id, req.user.workspaceId);
       if (!conversation) return res.status(404).json({ message: 'That conversation is not available.' });
       const message = asMessage(await createMessage(conversation, req.user, req.body.body, req.body.replyToId, req.body.attachments, req.body.clientMessageId));
-      io.to(room(conversation._id)).emit('message:new', message);
+      let delivery = io.to(room(conversation._id));
+      for (const memberId of conversation.memberIds) delivery = delivery.to(userRoom(memberId));
+      delivery.emit('message:new', message);
       return res.status(201).json({ message });
     } catch (error) {
       return res.status(400).json({ message: error.message || 'We could not send that message.' });

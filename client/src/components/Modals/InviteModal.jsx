@@ -22,7 +22,7 @@ function InviteModal({ onClose, onInvited }) {
         body: JSON.stringify({ email }),
       });
       setMessage(data.message);
-      if (data.person) onInvited?.();
+      if (data.person) onInvited?.(data);
       setEmail("");
     } catch (requestError) {
       setError(requestError.message);

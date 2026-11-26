@@ -54,6 +54,8 @@ const formatDate = (date) =>
 
 function App() {
   const [user, setUser] = useState(null);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState("");
+  const [workspaces, setWorkspaces] = useState([]);
   const [profileStatus, setProfileStatus] = useState("Available");
   const [authLoading, setAuthLoading] = useState(true);
   const [sessionError, setSessionError] = useState("");
@@ -196,7 +198,10 @@ function App() {
     const restoreSession = async () => {
       try {
         const data = await request("/api/me", { timeoutMs: 70000 });
-        if (active) setUser(data.user);
+        if (active) {
+          localStorage.setItem("relay_user_id", data.user.id);
+          setUser(data.user);
+        }
       } catch (error) {
         if (error.status === 401) localStorage.removeItem("relay_token");
         else if (active) setSessionError(error.message || "Could not reconnect to the server.");
@@ -221,7 +226,7 @@ function App() {
 
   useEffect(() => {
     if (!user) return undefined;
-    const client = createSocket(localStorage.getItem("relay_token"));
+    const client = createSocket(localStorage.getItem("relay_token"), activeWorkspaceId || user.workspaceId);
     setSocket(client);
     const onConnect = () => setSocketStatus("connected");
     const onDisconnect = () => setSocketStatus("reconnecting");
@@ -235,6 +240,21 @@ function App() {
       setChannels((current) => current.some((item) => getId(item) === getId(conversation))
         ? current.map((item) => getId(item) === getId(conversation) ? conversation : item)
         : [conversation, ...current]);
+    };
+    const onConversationNew = (conversation) => {
+      if (String(conversation.workspaceId) !== String(activeWorkspaceId || user.workspaceId)) return;
+      setChannels((current) => current.some((item) => getId(item) === getId(conversation)) ? current : [conversation, ...current]);
+    };
+    const onWorkspaceUpdated = ({ workspace }) => {
+      if (!workspace) return;
+      setWorkspaces((current) => current.some((item) => String(item._id) === String(workspace._id))
+        ? current.map((item) => String(item._id) === String(workspace._id) ? workspace : item)
+        : [...current, workspace].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)));
+      if (String(workspace._id) === String(activeWorkspaceId || user.workspaceId)) {
+        setPeople((workspace.members || []).map((member) => member.userId).filter(Boolean).map((person) => ({ ...person, id: getId(person) })));
+      } else {
+        setNotice(`You were added to ${workspace.name}. Switch to it from the workspace menu.`);
+      }
     };
     const onConversationUpdated = (conversation) => {
       setChannels((current) => current.map((item) => getId(item) === getId(conversation) ? conversation : item));
@@ -256,18 +276,22 @@ function App() {
     client.on("connect_error", onConnectError);
     client.on("presence:update", onPresence);
     client.on("conversation:available", onConversationAvailable);
+    client.on("conversation:new", onConversationNew);
+    client.on("workspace:updated", onWorkspaceUpdated);
     client.on("conversation:updated", onConversationUpdated);
     client.on("conversation:removed", onConversationRemoved);
     client.on("notification:new", onNotification);
     return () => {
       client.disconnect();
       client.off("conversation:available", onConversationAvailable);
+      client.off("conversation:new", onConversationNew);
+      client.off("workspace:updated", onWorkspaceUpdated);
       client.off("conversation:updated", onConversationUpdated);
       client.off("conversation:removed", onConversationRemoved);
       client.off("notification:new", onNotification);
       setSocket(null);
     };
-  }, [user?.id]);
+  }, [user?.id, activeWorkspaceId]);
 
   useEffect(() => {
     const term = search.trim();
@@ -293,12 +317,28 @@ function App() {
     const wakeTimer = window.setTimeout(() => {
       setStartupMessage("Waking up server (free hosting can take up to 50–60 seconds)…");
     }, 1800);
-    loadWorkspace()
-      .catch(() => {})
-      .finally(() => {
+    (async () => {
+      try {
+        const data = await request("/api/workspaces", { timeoutMs: 70000 });
+        const available = data.workspaces || [];
+        setWorkspaces(available);
+        const saved = localStorage.getItem(`relay_active_workspace_${user.id}`);
+        const selected = available.find((workspace) => String(workspace._id) === saved)
+          || available.find((workspace) => String(workspace._id) === String(user.workspaceId))
+          || available[0];
+        if (selected) {
+          localStorage.setItem(`relay_active_workspace_${user.id}`, String(selected._id));
+          setActiveWorkspaceId(String(selected._id));
+          setUser((current) => current ? { ...current, workspaceId: String(selected._id), workspaceName: selected.name } : current);
+        }
+        await loadWorkspace();
+      } catch {
+        // loadWorkspace records its own retry banner and error state.
+      } finally {
         window.clearTimeout(wakeTimer);
         setBusy(false);
-      });
+      }
+    })();
   }, [user?.id]);
 
   useEffect(() => {
@@ -619,10 +659,13 @@ function App() {
 
   const logout = () => {
     localStorage.removeItem("relay_token");
+    localStorage.removeItem("relay_user_id");
     setUser(null);
     setChannels([]);
     setMessages([]);
     setPeople([]);
+    setWorkspaces([]);
+    setActiveWorkspaceId("");
     setNotifications([]);
     setUnreadCounts({});
     setActiveChannelId("");
@@ -654,7 +697,7 @@ function App() {
       </div>
     </div>
   );
-  if (!user) return <AuthScreen onAuthenticated={(nextUser) => { setSessionError(""); setUser(nextUser); }} />;
+  if (!user) return <AuthScreen onAuthenticated={(nextUser) => { localStorage.setItem("relay_user_id", nextUser.id); setSessionError(""); setUser(nextUser); }} />;
 
   return (
     <div className="app-shell">
@@ -883,8 +926,8 @@ function App() {
           </button>
         </Modal>
       )}
-      {panel === "invite" && <InviteModal onClose={() => setPanel(null)} onInvited={() => loadWorkspace(activeChannelId)} />}
-      {panel === "workspaces" && <WorkspaceModal onClose={() => setPanel(null)} onJoined={async (nextUser) => { setUser(nextUser); setChannels([]); setMessages([]); setActiveChannelId(""); setPanel(null); await loadWorkspace(""); }} />}
+      {panel === "invite" && <InviteModal onClose={() => setPanel(null)} onInvited={(data) => { if (data.members) setPeople(data.members.map((member) => member.userId).filter(Boolean).map((person) => ({ ...person, id: getId(person) }))); void loadWorkspace(activeChannelId); }} />}
+      {panel === "workspaces" && <WorkspaceModal workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} onClose={() => setPanel(null)} onJoined={(data) => { setWorkspaces(data.workspaces || []); setNotice(`Added ${data.workspace?.name || "workspace"}. Switch to it from this menu.`); setPanel(null); }} onSwitch={(workspace) => { localStorage.setItem(`relay_active_workspace_${user.id}`, String(workspace._id)); setActiveWorkspaceId(String(workspace._id)); setUser((current) => ({ ...current, workspaceId: String(workspace._id), workspaceName: workspace.name })); setChannels([]); setMessages([]); setActiveChannelId(""); setPanel(null); void loadWorkspace(""); }} />}
       {panel === "notifications" && (
         <Modal title="Notifications" onClose={() => setPanel(null)}>
           <div className="notification-list">

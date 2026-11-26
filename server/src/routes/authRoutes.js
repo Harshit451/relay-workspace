@@ -18,6 +18,7 @@ export function registerRoutes(router, dependencies) {
         workspaceName: inviter?.workspaceName || `${name}'s workspace`,
       });
       user.workspaceId = workspaceId || user._id;
+      user.workspaceIds = [user.workspaceId];
       await user.save();
       await Workspace.updateOne({ _id: user.workspaceId }, { $setOnInsert: { name: user.workspaceName, createdBy: workspaceId || user._id }, $addToSet: { members: { userId: user._id, role: String(user.workspaceId) === String(user._id) ? 'owner' : 'member' } } }, { upsert: true, setDefaultsOnInsert: true });
       if (invitation) await Invite.updateOne({ _id: invitation._id }, { $set: { acceptedAt: new Date(), workspaceId: user.workspaceId } });
@@ -39,14 +40,11 @@ export function registerRoutes(router, dependencies) {
         const inviter = await User.findById(invitation.invitedBy).select('workspaceId workspaceName');
         if (invitation.workspaceId || inviter?.workspaceId) {
           const invitedWorkspaceId = invitation.workspaceId || inviter.workspaceId;
-          const changedWorkspace = String(user.workspaceId) !== String(invitedWorkspaceId);
-          user.workspaceId = invitedWorkspaceId;
-          user.workspaceName = inviter?.workspaceName || user.workspaceName;
-          await user.save();
-          await Workspace.updateOne({ _id: user.workspaceId }, { $setOnInsert: { name: inviter?.workspaceName || user.workspaceName, createdBy: user.workspaceId }, $addToSet: { members: { userId: user._id, role: String(user.workspaceId) === String(user._id) ? 'owner' : 'member' } } }, { upsert: true, setDefaultsOnInsert: true });
-          if (changedWorkspace) await Notification.deleteMany({ userId: user._id });
-          await Invite.updateOne({ _id: invitation._id }, { $set: { acceptedAt: new Date(), workspaceId: user.workspaceId } });
-          await seedStarterChannels(Conversation, user.workspaceId);
+          await Workspace.updateOne({ _id: invitedWorkspaceId }, { $setOnInsert: { name: inviter?.workspaceName || 'Workspace', createdBy: invitedWorkspaceId }, $addToSet: { members: { userId: user._id, role: 'member' } } }, { upsert: true, setDefaultsOnInsert: true });
+          await User.updateOne({ _id: user._id }, { $addToSet: { workspaceIds: invitedWorkspaceId } });
+          user.workspaceIds = [...new Set([...(user.workspaceIds || []).map(String), String(invitedWorkspaceId)])];
+          await Invite.updateOne({ _id: invitation._id }, { $set: { acceptedAt: new Date(), workspaceId: invitedWorkspaceId } });
+          await seedStarterChannels(Conversation, invitedWorkspaceId);
         }
       }
       return res.json({ user: asUser(user), token: jwt.sign({ sub: String(user._id) }, secret, { expiresIn: '7d' }) });

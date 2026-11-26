@@ -75,13 +75,13 @@ const canAccess = async (id, userId, workspaceId) => {
   return conversation;
 };
 const createMessage = createMessageController({ mongoose, Message, Upload, User, Notification, io, userRoom });
-const auth = createAuthMiddleware({ jwt, secret, User });
+const auth = createAuthMiddleware({ jwt, secret, User, Workspace });
 
 app.use(createApiRouter({ express, mongoose, bcrypt, jwt, secret, User, Workspace, Conversation, Message, Notification, Invite, Upload, asUser, asMessage, text, email, initials, colors, auth, safeAsync, canAccess, createMessage, room, userRoom, workspaceRoom, io, cloudinary, uploadFile, seedStarterChannels }));
 
 app.use(handleError);
 
-registerSocketHandlers({ io, jwt, secret, User, asUser, userRoom, room, workspaceRoom, canAccess, createMessage, asMessage, mongoose, Message });
+registerSocketHandlers({ io, jwt, secret, User, Workspace, asUser, userRoom, room, workspaceRoom, canAccess, createMessage, asMessage, mongoose, Message });
 
 const start = async () => {
   await connectDatabase({ uri, dbName });
@@ -108,6 +108,7 @@ const start = async () => {
       $setOnInsert: { name: owner?.workspaceName || 'My workspace', createdBy: workspaceId, inviteCode: owner?.workspaceInviteCode || undefined, members: members.map((member) => ({ userId: member._id, role: String(member._id) === String(workspaceId) ? 'owner' : 'member' })) },
     }, { upsert: true, setDefaultsOnInsert: true });
     await Workspace.updateOne({ _id: workspaceId }, { $addToSet: { members: { $each: members.map((member) => ({ userId: member._id, role: String(member._id) === String(workspaceId) ? 'owner' : 'member' })) } } });
+    await User.updateMany({ workspaceId }, { $addToSet: { workspaceIds: workspaceId } });
     await seedStarterChannels(Conversation, workspaceId);
   }));
   server.listen(port, '0.0.0.0', () => console.log('API and Socket.IO listening on port ' + port));

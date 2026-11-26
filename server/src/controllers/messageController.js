@@ -39,12 +39,12 @@ export const createMessageController = ({ mongoose, Message, Upload, User, Notif
   await conversation.save();
   const recipients = new Map();
   if (conversation.type !== 'channel') {
-    const awayMembers = await User.find({ _id: { $in: conversation.memberIds, $ne: user._id }, workspaceId: user.workspaceId, presence: { $ne: 'online' } }).select('_id');
+    const awayMembers = await User.find({ _id: { $in: conversation.memberIds, $ne: user._id }, $or: [{ workspaceIds: conversation.workspaceId }, { workspaceId: conversation.workspaceId }], presence: { $ne: 'online' } }).select('_id');
     for (const member of awayMembers) recipients.set(String(member._id), { userId: member._id, title: 'New message from ' + user.name });
   }
   const mentionedEmails = [...String(body).matchAll(/@([\w.+-]+@[\w.-]+\.\w+)/g)].map((match) => match[1].toLowerCase());
   if (mentionedEmails.length) {
-    const mentioned = await User.find({ email: { $in: mentionedEmails }, _id: { $ne: user._id }, workspaceId: user.workspaceId }).select('_id');
+    const mentioned = await User.find({ email: { $in: mentionedEmails }, _id: { $ne: user._id }, $or: [{ workspaceIds: conversation.workspaceId }, { workspaceId: conversation.workspaceId }] }).select('_id');
     for (const member of mentioned) recipients.set(String(member._id), { userId: member._id, title: 'You were mentioned by ' + user.name });
   }
   if (recipients.size) {

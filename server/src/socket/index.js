@@ -1,4 +1,4 @@
-export function registerSocketHandlers({ io, jwt, secret, User, asUser, userRoom, room, workspaceRoom, canAccess, createMessage, asMessage, mongoose, Message }) {
+export function registerSocketHandlers({ io, jwt, secret, User, Workspace, asUser, userRoom, room, workspaceRoom, canAccess, createMessage, asMessage, mongoose, Message }) {
 io.use(async (socket, next) => {
   try {
     const payload = jwt.verify(String(socket.handshake.auth?.token || ''), secret);
@@ -13,12 +13,16 @@ io.use(async (socket, next) => {
 io.on('connection', async (socket) => {
   const user = socket.data.user;
   const id = String(user._id);
+  const requestedWorkspaceId = String(socket.handshake.auth?.workspaceId || user.workspaceId || '');
+  const activeWorkspace = await Workspace.findOne({ _id: requestedWorkspaceId, 'members.userId': user._id }).select('_id').lean();
+  const activeWorkspaceId = activeWorkspace?._id || user.workspaceId;
+  socket.data.workspaceId = activeWorkspaceId;
   socket.join(userRoom(id));
-  socket.join(workspaceRoom(user.workspaceId));
+  socket.join(workspaceRoom(activeWorkspaceId));
   await User.updateOne({ _id: user._id }, { $set: { presence: 'online' } });
-  io.to(workspaceRoom(user.workspaceId)).emit('presence:update', { ...asUser(user), presence: 'online' });
+  io.to(workspaceRoom(activeWorkspaceId)).emit('presence:update', { ...asUser(user), presence: 'online' });
   socket.on('conversation:join', async (payload = {}, ack = () => {}) => {
-    const conversation = await canAccess(payload.conversationId, user._id, user.workspaceId);
+    const conversation = await canAccess(payload.conversationId, user._id, activeWorkspaceId);
     if (!conversation) return ack({ ok: false, message: 'That conversation is not available.' });
     await socket.join(room(conversation._id));
     return ack({ ok: true });
@@ -28,22 +32,24 @@ io.on('connection', async (socket) => {
   });
   socket.on('message:send', async (payload = {}, ack = () => {}) => {
     try {
-      const conversation = await canAccess(payload.conversationId, user._id, user.workspaceId);
+      const conversation = await canAccess(payload.conversationId, user._id, activeWorkspaceId);
       if (!conversation) return ack({ ok: false, message: 'That conversation is not available.' });
       const message = asMessage(await createMessage(conversation, user, payload.body, payload.replyToId, payload.attachments, payload.clientMessageId));
-      io.to(room(conversation._id)).emit('message:new', message);
+      let delivery = io.to(room(conversation._id));
+      for (const memberId of conversation.memberIds) delivery = delivery.to(userRoom(memberId));
+      delivery.emit('message:new', message);
       return ack({ ok: true, message });
     } catch (error) {
       return ack({ ok: false, message: error.message || 'Message could not be sent.' });
     }
   });
   socket.on('message:typing', async (payload = {}) => {
-    const conversation = await canAccess(payload.conversationId, user._id, user.workspaceId);
+    const conversation = await canAccess(payload.conversationId, user._id, activeWorkspaceId);
     if (!conversation || !socket.rooms.has(room(conversation._id))) return;
     socket.to(room(conversation._id)).emit('user:typing', { conversationId: String(conversation._id), user: asUser(user), active: Boolean(payload.active) });
   });
   socket.on('message:read', async (payload = {}) => {
-    const conversation = await canAccess(payload.conversationId, user._id, user.workspaceId);
+    const conversation = await canAccess(payload.conversationId, user._id, activeWorkspaceId);
     if (!conversation) return;
     const messageIds = Array.isArray(payload.messageIds) ? payload.messageIds.slice(0, 100).filter(mongoose.isValidObjectId) : [];
     if (!messageIds.length) return;
@@ -60,7 +66,7 @@ io.on('connection', async (socket) => {
     if ((await io.in(userRoom(id)).allSockets()).size) return;
     const lastSeenAt = new Date();
     await User.updateOne({ _id: user._id }, { $set: { presence: 'offline', lastSeenAt } });
-    io.to(workspaceRoom(user.workspaceId)).emit('presence:update', { ...asUser(user), presence: 'offline', lastSeenAt });
+    io.to(workspaceRoom(activeWorkspaceId)).emit('presence:update', { ...asUser(user), presence: 'offline', lastSeenAt });
   });
 });
 

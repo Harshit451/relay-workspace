@@ -2,33 +2,6 @@
 
 Relay is a real-time team chat built with React, Vite, Express, Socket.IO, MongoDB, and Cloudinary. Each account belongs to a workspace; new signups get a private workspace unless they use an email with a pending invitation. Root npm scripts use concurrently, with dedicated manifests in `client/` and `server/`.
 
-## Project structure
-
-```text
-.
-├── client/                 # React + Vite app
-│   ├── src/
-│   │   ├── components/     # Auth, shared modal, and modal flows
-│   │   ├── lib/            # Shared client helpers
-│   │   ├── services/       # REST API and Socket.IO clients
-│   │   └── styles/         # App styles
-│   ├── .env.example        # Vite API URL template
-│   └── package.json
-├── server/                 # Express + Socket.IO API
-│   ├── src/
-│   │   ├── config/          # Environment, database, and Cloudinary setup
-│   │   ├── controllers/     # Message business logic
-│   │   ├── middleware/      # Auth, upload, and error handling
-│   │   ├── models/          # Mongoose models
-│   │   ├── routes/          # Auth, conversation, message, upload, and search routes
-│   │   ├── socket/          # JWT-authenticated Socket.IO handlers
-│   │   ├── utils/           # Starter data seeding
-│   │   └── index.js         # HTTP server composition and startup
-│   └── package.json
-├── .env.example             # Root-level server environment template
-├── package.json            # Root scripts and shared dependency installation
-└── README.md
-```
 
 The root scripts stay compatible with Render and local development:
 
@@ -72,7 +45,7 @@ Create an empty GitHub repository and from this project root run:
 ```sh
 git add .
 git status --short
-git commit -m "Refactor Relay into MERN client and server folders"
+git commit -m "Relay workspace"
 git branch -M main
 git remote add origin https://github.com/<your-user>/<your-repository>.git
 git push -u origin main
@@ -98,3 +71,80 @@ Confirm `.env`, `client/.env`, and `server/.env` are ignored before committing. 
 - Environment variable: `VITE_API_URL=https://<your-backend-service>.onrender.com`
 
 Set `CLIENT_ORIGIN` on the backend to the exact deployed frontend origin, then redeploy. Verify `/api/health`, sign in, and test live messages using two browser sessions. The free Render web service may sleep after inactivity. This implementation currently expects one backend instance; multiple instances need a Socket.IO Redis adapter and suitable load-balancer session handling.
+
+## Project structure
+
+```
+project
+├─ client
+│  ├─ index.html
+│  ├─ package.json
+│  ├─ postcss.config.mjs
+│  ├─ src
+│  │  ├─ App.jsx
+│  │  ├─ components
+│  │  │  ├─ AuthScreen.jsx
+│  │  │  ├─ ChatHeader.jsx
+│  │  │  ├─ MessageComposer.jsx
+│  │  │  ├─ MessageList.jsx
+│  │  │  ├─ Modal.jsx
+│  │  │  ├─ Modals
+│  │  │  │  ├─ ChannelModal.jsx
+│  │  │  │  ├─ GroupModal.jsx
+│  │  │  │  ├─ InviteModal.jsx
+│  │  │  │  ├─ MembersModal.jsx
+│  │  │  │  └─ WorkspaceModal.jsx
+│  │  │  └─ Sidebar.jsx
+│  │  ├─ context
+│  │  ├─ hooks
+│  │  ├─ lib
+│  │  │  └─ format.js
+│  │  ├─ main.jsx
+│  │  ├─ services
+│  │  │  ├─ api.js
+│  │  │  └─ socket.js
+│  │  └─ styles
+│  │     └─ styles.css
+│  └─ vite.config.js
+├─ package-lock.json
+├─ package.json
+├─ README.md
+└─ server
+   ├─ package.json
+   └─ src
+      ├─ config
+      │  ├─ cloudinary.js
+      │  ├─ db.js
+      │  └─ env.js
+      ├─ controllers
+      │  └─ messageController.js
+      ├─ index.js
+      ├─ middleware
+      │  ├─ authMiddleware.js
+      │  ├─ errorHandler.js
+      │  └─ uploadMiddleware.js
+      ├─ models
+      │  ├─ Conversation.js
+      │  ├─ index.js
+      │  ├─ Invite.js
+      │  ├─ Message.js
+      │  ├─ Notification.js
+      │  ├─ Upload.js
+      │  ├─ User.js
+      │  └─ Workspace.js
+      ├─ routes
+      │  ├─ apiRoutes.js
+      │  ├─ authRoutes.js
+      │  ├─ conversationRoutes.js
+      │  ├─ memberRoutes.js
+      │  ├─ messageRoutes.js
+      │  ├─ messageWriteRoutes.js
+      │  ├─ searchRoutes.js
+      │  ├─ uploadRoutes.js
+      │  └─ workspaceRoutes.js
+      ├─ socket
+      │  └─ index.js
+      └─ utils
+         └─ seed.js
+
+```

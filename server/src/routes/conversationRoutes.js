@@ -39,12 +39,17 @@ export function registerRoutes(router, dependencies) {
       if (type === 'dm' && memberIds.length !== 2) return res.status(400).json({ message: 'A direct message needs exactly one other person.' });
       if (type === 'group' && memberIds.length < 2) return res.status(400).json({ message: 'Add at least one person to the group.' });
       if (!memberIds.every(mongoose.isValidObjectId)) return res.status(400).json({ message: 'One or more members are invalid.' });
-      if ((await User.countDocuments({ _id: { $in: memberIds }, workspaceId: req.user.workspaceId })) !== memberIds.length) return res.status(400).json({ message: 'Choose people who belong to your workspace.' });
+      if ((await User.countDocuments({ _id: { $in: memberIds }, $or: [{ workspaceIds: req.user.workspaceId }, { workspaceId: req.user.workspaceId }] })) !== memberIds.length) return res.status(400).json({ message: 'Choose people who belong to your workspace.' });
       if (type === 'dm') {
         const existing = await Conversation.findOne({ workspaceId: req.user.workspaceId, type: 'dm', memberIds: { $all: memberIds, $size: memberIds.length } });
         if (existing) return res.json({ conversation: existing });
       }
       const conversation = await Conversation.create({ workspaceId: req.user.workspaceId, type, name, memberIds, adminIds: type === 'group' ? [req.user._id] : [], createdBy: req.user._id });
+      for (const memberId of memberIds) {
+        const sockets = await io.in(userRoom(memberId)).fetchSockets();
+        for (const socket of sockets) if (String(socket.data.workspaceId) === String(conversation.workspaceId)) await socket.join(room(conversation._id));
+        io.to(userRoom(memberId)).emit('conversation:new', conversation);
+      }
       return res.status(201).json({ conversation });
     } catch (error) {
       return res.status(400).json({ message: error.message || 'We could not create that conversation.' });

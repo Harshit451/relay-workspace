@@ -1006,6 +1006,11 @@ p {
 .invite-code-row { display: flex; gap: 8px; }
 .invite-code-row input { min-width: 0; flex: 1; font-weight: 700; letter-spacing: 0.12em; }
 .invite-code-row button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
+.workspace-list { display: grid; gap: 6px; margin-bottom: 18px; }
+.workspace-option { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 1px solid #273646; border-radius: 8px; background: #111c28; color: #d7e1ed; text-align: left; }
+.workspace-option.selected { border-color: #587ba5; background: #1b2b3e; }
+.workspace-option > span:nth-child(2) { flex: 1; }
+.workspace-option small { color: #91a8c0; }
 .loading-state,
 .empty-state {
   display: grid;

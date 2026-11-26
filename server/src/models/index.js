@@ -4,3 +4,4 @@ export { Message } from './Message.js';
 export { Notification } from './Notification.js';
 export { Invite } from './Invite.js';
 export { Upload } from './Upload.js';
+export { Workspace } from './Workspace.js';

@@ -10,7 +10,7 @@ function InviteModal({ onClose, onInvited }) {
   const [inviteCode, setInviteCode] = useState("");
   const [copied, setCopied] = useState(false);
   useEffect(() => {
-    request("/api/workspaces/current").then((data) => setInviteCode(data.workspace.inviteCode)).catch(() => {});
+    request("/api/workspaces/current").then((data) => setInviteCode(String(data.workspace.inviteCode || "").trim())).catch(() => {});
   }, []);
   const submit = async (event) => {
     event.preventDefault();
@@ -36,7 +36,7 @@ function InviteModal({ onClose, onInvited }) {
         </p>
         <label>
           Workspace invite code
-          <div className="invite-code-row"><input readOnly value={inviteCode} /><button className="secondary-button" type="button" onClick={async () => { await navigator.clipboard.writeText(inviteCode); setCopied(true); }}>{copied ? "Copied" : <><Copy size={15} /> Copy</>}</button></div>
+          <div className="invite-code-row"><input readOnly value={inviteCode} /><button className="secondary-button" type="button" disabled={!inviteCode} onClick={async () => { await navigator.clipboard.writeText(inviteCode.trim()); setCopied(true); }}>{copied ? "Copied" : <><Copy size={15} /> Copy</>}</button></div>
         </label>
         <label>
           Email address

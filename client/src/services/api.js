@@ -17,7 +17,7 @@ export const request = async (path, options = {}) => {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = new Error(data.message || "Something went wrong.");
+      const error = new Error(data.message || data.error || `Request failed with status ${response.status}.`);
       error.status = response.status;
       throw error;
     }

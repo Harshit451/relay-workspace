@@ -12,7 +12,7 @@ export default function WorkspaceModal({ onClose, onJoined }) {
     setBusy(true);
     setError("");
     try {
-      const data = await request("/api/workspaces/join", { method: "POST", body: JSON.stringify({ inviteCode }) });
+      const data = await request("/api/workspaces/join", { method: "POST", body: JSON.stringify({ code: inviteCode.trim() }) });
       onJoined(data.user);
     } catch (err) {
       setError(err.message);

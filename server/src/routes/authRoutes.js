@@ -1,5 +1,5 @@
 export function registerRoutes(router, dependencies) {
-  const { mongoose, bcrypt, jwt, secret, User, Conversation, Invite, Notification, asUser, text, email, initials, colors, auth, safeAsync, io, workspaceRoom, seedStarterChannels } = dependencies;
+  const { mongoose, bcrypt, jwt, secret, User, Workspace, Conversation, Invite, Notification, asUser, text, email, initials, colors, auth, safeAsync, io, workspaceRoom, seedStarterChannels } = dependencies;
   router.get('/api/health', (_req, res) => res.json({ ok: true, database: mongoose.connection.readyState === 1 }));
   router.post('/api/auth/signup', async (req, res) => {
     try {
@@ -19,6 +19,7 @@ export function registerRoutes(router, dependencies) {
       });
       user.workspaceId = workspaceId || user._id;
       await user.save();
+      await Workspace.updateOne({ _id: user.workspaceId }, { $setOnInsert: { name: user.workspaceName, createdBy: workspaceId || user._id }, $addToSet: { members: { userId: user._id, role: String(user.workspaceId) === String(user._id) ? 'owner' : 'member' } } }, { upsert: true, setDefaultsOnInsert: true });
       if (invitation) await Invite.updateOne({ _id: invitation._id }, { $set: { acceptedAt: new Date(), workspaceId: user.workspaceId } });
       await seedStarterChannels(Conversation, user.workspaceId);
       return res.status(201).json({ user: asUser(user), token: jwt.sign({ sub: String(user._id) }, secret, { expiresIn: '7d' }) });
@@ -42,6 +43,7 @@ export function registerRoutes(router, dependencies) {
           user.workspaceId = invitedWorkspaceId;
           user.workspaceName = inviter?.workspaceName || user.workspaceName;
           await user.save();
+          await Workspace.updateOne({ _id: user.workspaceId }, { $setOnInsert: { name: inviter?.workspaceName || user.workspaceName, createdBy: user.workspaceId }, $addToSet: { members: { userId: user._id, role: String(user.workspaceId) === String(user._id) ? 'owner' : 'member' } } }, { upsert: true, setDefaultsOnInsert: true });
           if (changedWorkspace) await Notification.deleteMany({ userId: user._id });
           await Invite.updateOne({ _id: invitation._id }, { $set: { acceptedAt: new Date(), workspaceId: user.workspaceId } });
           await seedStarterChannels(Conversation, user.workspaceId);

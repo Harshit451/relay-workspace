@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
-import { Conversation, Invite, Message, Notification, Upload, User } from './models/index.js';
+import { Conversation, Invite, Message, Notification, Upload, User, Workspace } from './models/index.js';
 import { connectDatabase } from './config/db.js';
 import { configureCloudinary, cloudinary } from './config/cloudinary.js';
 import { createApiRouter } from './routes/apiRoutes.js';
@@ -77,7 +77,7 @@ const canAccess = async (id, userId, workspaceId) => {
 const createMessage = createMessageController({ mongoose, Message, Upload, User, Notification, io, userRoom });
 const auth = createAuthMiddleware({ jwt, secret, User });
 
-app.use(createApiRouter({ express, mongoose, bcrypt, jwt, secret, User, Conversation, Message, Notification, Invite, Upload, asUser, asMessage, text, email, initials, colors, auth, safeAsync, canAccess, createMessage, room, userRoom, workspaceRoom, io, cloudinary, uploadFile, seedStarterChannels }));
+app.use(createApiRouter({ express, mongoose, bcrypt, jwt, secret, User, Workspace, Conversation, Message, Notification, Invite, Upload, asUser, asMessage, text, email, initials, colors, auth, safeAsync, canAccess, createMessage, room, userRoom, workspaceRoom, io, cloudinary, uploadFile, seedStarterChannels }));
 
 app.use(handleError);
 
@@ -101,7 +101,15 @@ const start = async () => {
   );
   await User.updateMany({ presence: 'online' }, { $set: { presence: 'offline', lastSeenAt: new Date() } });
   const workspaceIds = await User.distinct('workspaceId', { workspaceId: { $ne: null } });
-  await Promise.all(workspaceIds.map((workspaceId) => seedStarterChannels(Conversation, workspaceId)));
+  await Promise.all(workspaceIds.map(async (workspaceId) => {
+    const members = await User.find({ workspaceId }).select('_id').lean();
+    const owner = await User.findById(workspaceId).select('workspaceName workspaceInviteCode').lean();
+    await Workspace.updateOne({ _id: workspaceId }, {
+      $setOnInsert: { name: owner?.workspaceName || 'My workspace', createdBy: workspaceId, inviteCode: owner?.workspaceInviteCode || undefined, members: members.map((member) => ({ userId: member._id, role: String(member._id) === String(workspaceId) ? 'owner' : 'member' })) },
+    }, { upsert: true, setDefaultsOnInsert: true });
+    await Workspace.updateOne({ _id: workspaceId }, { $addToSet: { members: { $each: members.map((member) => ({ userId: member._id, role: String(member._id) === String(workspaceId) ? 'owner' : 'member' })) } } });
+    await seedStarterChannels(Conversation, workspaceId);
+  }));
   server.listen(port, '0.0.0.0', () => console.log('API and Socket.IO listening on port ' + port));
 };
 start().catch((error) => {

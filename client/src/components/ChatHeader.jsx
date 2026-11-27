@@ -1,7 +1,7 @@
 import { Hash, MoreHorizontal, Search, X } from "lucide-react";
 
 export default function ChatHeader({ activeChannel, socketStatus, search, setSearch, setPanel, conversationLabel }) {
-  return (
+  return ( 
 <section className="conversation-header">
             <div className="conversation-title">
               <span

@@ -6,7 +6,7 @@ const iconForChannel = (icon) => icon === "palette" ? Palette : icon === "termin
 export default function Sidebar({ mobileMenuOpen, sidebarOpen, setSidebarOpen, setMobileMenuOpen, userId, messages, setPanel, channels, activeChannelId, selectChannel, unreadCounts, people, conversationLabel }) {
   return (
 <aside className={`sidebar ${mobileMenuOpen ? "mobile-visible" : ""}`}>
-          <div className="sidebar-heading">
+          <div className="sidebar-heading"> 
             <div>
               <p className="eyebrow">Workspace</p>
               <h1>Team hub</h1>
@@ -56,7 +56,7 @@ export default function Sidebar({ mobileMenuOpen, sidebarOpen, setSidebarOpen, s
                 onClick={() => setPanel("channel")}
               >
                 <Plus size={15} />
-              </button>
+              </button> 
             </div>
             {channels.filter((channel) => channel.type === "channel").map((channel) => {
               const ChannelIcon = iconForChannel(channel.icon);

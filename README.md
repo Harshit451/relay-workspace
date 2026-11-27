@@ -45,7 +45,7 @@ Create an empty GitHub repository and from this project root run:
 ```sh
 git add .
 git status --short
-git commit -m "Relay workspace"
+git commit -m "Relay Chat workspace"
 git branch -M main
 git remote add origin https://github.com/<your-user>/<your-repository>.git
 git push -u origin main

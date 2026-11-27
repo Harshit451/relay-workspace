@@ -90,7 +90,7 @@ export default function Sidebar({ mobileMenuOpen, sidebarOpen, setSidebarOpen, s
               </button>
             </div>
             {channels.filter((channel) => channel.type !== "channel").map((conversation) => (
-              <button
+              <button 
                 key={getId(conversation)}
                 className={`channel-item ${getId(conversation) === activeChannelId ? "selected" : ""}`}
                 type="button"
@@ -110,7 +110,7 @@ export default function Sidebar({ mobileMenuOpen, sidebarOpen, setSidebarOpen, s
               className="nav-item"
               type="button"
               onClick={() => setPanel("settings")}
-            >
+            > 
               <Settings size={17} />
               <span>Workspace settings</span>
             </button>

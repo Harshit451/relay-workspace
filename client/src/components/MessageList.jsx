@@ -118,7 +118,7 @@ export default function MessageList({ messageAreaRef, setShowJumpLatest, loadOld
                         )}
                       </div>
                     )}
-                  </div>
+                  </div> 
                 </article>
               ))
             )}
@@ -128,6 +128,6 @@ export default function MessageList({ messageAreaRef, setShowJumpLatest, loadOld
               </div>
             )}
             {showJumpLatest && <button className="jump-to-button jump-latest" type="button" onClick={jumpToLatest}>Jump to latest</button>}
-          </div>
+          </div> 
   );
 }
